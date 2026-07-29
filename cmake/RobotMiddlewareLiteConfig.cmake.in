@@ -1,0 +1,9 @@
+@PACKAGE_INIT@
+
+# 安装后的包配置：先恢复线程依赖，再导入 RobotMiddlewareLite 目标。
+include(CMakeFindDependencyMacro)
+find_dependency(Threads)
+
+include("${CMAKE_CURRENT_LIST_DIR}/RobotMiddlewareLiteTargets.cmake")
+
+check_required_components(RobotMiddlewareLite)

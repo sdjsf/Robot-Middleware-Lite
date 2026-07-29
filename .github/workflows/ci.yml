@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: GCC Debug
+            cmake_args: -DCMAKE_BUILD_TYPE=Debug
+          - name: GCC ASan and UBSan
+            cmake_args: -DCMAKE_BUILD_TYPE=Debug -DRML_ENABLE_ASAN=ON
+
+    env:
+      CC: gcc
+      CXX: g++
+      ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+      UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Validate benchmark tooling
+        run: |
+          bash -n benchmark/run_load_matrix.sh
+          PYTHONDONTWRITEBYTECODE=1 \
+            python3 benchmark/run_udp_matrix.py --help >/dev/null
+          python3 -m json.tool \
+            benchmark/baselines/ubuntu24_loopback_baseline.json >/dev/null
+
+      - name: Configure
+        run: >-
+          cmake -S . -B build
+          ${{ matrix.cmake_args }}
+          -DBUILD_TESTING=ON
+
+      - name: Build
+        run: cmake --build build --parallel 2
+
+      - name: Run tests
+        run: ctest --test-dir build --output-on-failure --timeout 60
+
+      - name: Verify install tree
+        run: cmake --install build --prefix "$RUNNER_TEMP/rml-install"
